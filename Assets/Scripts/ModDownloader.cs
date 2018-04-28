@@ -6,7 +6,6 @@ using UnityEngine.UI;
 using System.Xml;
 using System.Xml.Serialization;
 using System.IO;
-using Ionic.Zip;
 using System;
 
 //TODO: add support for custom compatibilities

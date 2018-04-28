@@ -13,7 +13,7 @@ public partial class ModInstaller
 
         string subPath = path.Substring(startIndex);
         
-        string convertedPath = settings.Settings.gamePath +@"\"+ subPath;
+        string convertedPath = settings.Settings.gamePath +@"/"+ subPath;
         return convertedPath;
     }
 

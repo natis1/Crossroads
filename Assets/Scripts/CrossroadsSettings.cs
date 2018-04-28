@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
+using System.Windows.Forms;
 using System.Xml;
 using System.Xml.Serialization;
 using System.IO;
@@ -28,12 +29,10 @@ public class CrossroadsSettings : MonoBehaviour
     //functions to run after loading is complete
     public UnityEngine.Events.UnityEvent OnLoaded;
 
-    [SerializeField]
     bool debugSkipHollowKnightFolderFinder = false;
 
     bool foundGamePath = false;
 
-    [SerializeField]
     string settingsFolderName = "Settings";
     public string SettingsFolderPath
     {
@@ -43,7 +42,6 @@ public class CrossroadsSettings : MonoBehaviour
         }
     }
 
-    [SerializeField]
     string settingsFileName = "settings.xml";
     public string SettingsFilePath
     {
@@ -54,9 +52,7 @@ public class CrossroadsSettings : MonoBehaviour
     }
     
     //folder for downloaded mod files
-    [SerializeField]
     string localModRepoFolderName = "DownloadedMods";
-    //string localModRepoFolderPath = "";
     public string LocalModRepoFolderPath
     {
         get
@@ -67,10 +63,8 @@ public class CrossroadsSettings : MonoBehaviour
         }
     }
 
-    [SerializeField]
-    string defaultModInstallFolderName = "hollow_knight_Data\\Managed\\Mods";
+    string defaultModInstallFolderName = "hollow_knight_Data/Managed/Mods/";
 
-    [SerializeField]
     string defaultGameFolderName = "Hollow Knight";
 
     public string BackupPath {
@@ -115,30 +109,29 @@ public class CrossroadsSettings : MonoBehaviour
     {
         Loaded = false;
         
-        if( Application.dataPath.Contains( "Temp" ) )
+        if( UnityEngine.Application.dataPath.Contains( "Temp" ) )
         {
             System.Windows.Forms.MessageBox.Show( "Crossroads will not run from inside a windows Temp directory. Please extract this program into another location." );
-            Application.Quit();
+            UnityEngine.Application.Quit();
             yield break;
         }
 
-        yield return SetupDefaults();
 
         AppSettings appSettings = new AppSettings();
         if( !ReadSettingsFromFile( out appSettings ) )
         {
             System.Windows.Forms.MessageBox.Show( "Failed to read settings file. " );
-            Application.Quit();
+            UnityEngine.Application.Quit();
         }
         else
         {
-            if( File.Exists( appSettings.gamePath + "/hollow_knight.exe" ) )
+            if( File.Exists( appSettings.gamePath + "/hollow_knight.exe" ) || File.Exists( appSettings.gamePath + "/hollow_knight.x86_64" ) )
             {
                 foundGamePath = true;
             }
             else
             {
-                if( Application.isEditor )
+                if( UnityEngine.Application.isEditor )
                     Debug.LogError( "Warning: Did not find hollow_knight.exe at " + appSettings.gamePath );
                 else
                     System.Windows.Forms.MessageBox.Show( "Warning: Did not find hollow_knight.exe at " + appSettings.gamePath +@". Please find the 'Hollow Knight' directory and select it." );
@@ -205,10 +198,8 @@ public class CrossroadsSettings : MonoBehaviour
             {
                 Settings.gamePath = SettingsFolderPath;
                 Settings.modsInstallPath = SettingsFolderPath + defaultModInstallFolderName;
-
                 if(!Directory.Exists(Settings.modsInstallPath))
                     Directory.CreateDirectory(Settings.modsInstallPath);
-
                 WriteSettingsToFile(Settings);
             }
             else
@@ -249,7 +240,7 @@ public class CrossroadsSettings : MonoBehaviour
             yield break;
 
         //search local steam directories first
-        string localSteamPath = (value as string) + "/SteamApps/common";
+        string localSteamPath = (value as string) + "/steamapps/common";
         Debug.Log( localSteamPath );
         if( Directory.Exists( localSteamPath ) )
         {
@@ -354,6 +345,8 @@ public class CrossroadsSettings : MonoBehaviour
 
     void WriteSettingsToFile(AppSettings settings)
     {
+        if(!Directory.Exists(SettingsFolderPath))
+            Directory.CreateDirectory(SettingsFolderPath);
         XmlSerializer serializer = new XmlSerializer(typeof(AppSettings));
         FileStream fstream = null;
         try
@@ -377,8 +370,9 @@ public class CrossroadsSettings : MonoBehaviour
 
         if(!File.Exists( SettingsFilePath ) )
         {
-            System.Windows.Forms.MessageBox.Show("No settings file found at " + SettingsFilePath );
-            return false;
+            System.Windows.Forms.MessageBox.Show("No settings file found at " + SettingsFilePath + ". If this is your first time running Crossroads this is normal." );
+            CreateDefaultSettings();
+            return ReadSettingsFromFile(out settings);
         }
 
         bool returnResult = true;
@@ -410,7 +404,7 @@ public class CrossroadsSettings : MonoBehaviour
         //Debug.Log( Settings.gamePath );
         Settings.gamePath = path;
         //Debug.Log( Settings.gamePath );
-        Settings.modsInstallPath = path + "\\" + defaultModInstallFolderName;
+        Settings.modsInstallPath = path + "/" + defaultModInstallFolderName;
 
         if(!Directory.Exists(Settings.modsInstallPath))
             Directory.CreateDirectory(Settings.modsInstallPath);
@@ -427,21 +421,53 @@ public class CrossroadsSettings : MonoBehaviour
 
         if(settings == null)
             return;
-        
+
         Settings = settings;
 
         //create the folder to store downloaded mods
         if( !Directory.Exists( LocalModRepoFolderPath ) )
             Directory.CreateDirectory( LocalModRepoFolderPath );
-        
         gamePathLabel.text = Settings.gamePath;
         localRepoLabel.text = LocalModRepoFolderPath;
         modsFolderLabel.text = Settings.modsInstallPath;
-        
         Loaded = true;
         if(OnLoaded != null)
             OnLoaded.Invoke();
     }
+    bool getHollowKnightExeLinux(string startingPath)
+    {
+        var dlg = new OpenFileDialog()
+        {
+            Title            = "Choose your Hollow Knight executable",
+            AddExtension     = true,
+            CheckFileExists  = true,
+            CheckPathExists  = true,
+            InitialDirectory = startingPath,
+            Multiselect      = false
+        };
+        if (dlg.ShowDialog() == DialogResult.OK && dlg.FileNames.Length > 0)
+        {
+            string checkPath = Path.GetDirectoryName(dlg.FileName);
+            Debug.Log( checkPath );
+            if( Directory.Exists(checkPath) && (File.Exists( checkPath + "/hollow_knight.exe" ) || File.Exists( checkPath + "/hollow_knight.x86_64" )))
+            {
+                Settings.gamePath = checkPath;
+                Settings.modsInstallPath = checkPath + "/" + defaultModInstallFolderName;
+                WriteFoundGamePath( checkPath );
+                // The directory searching window does not disappear on Linux unless you replace it with a message box. Yes it is stupid I agree. This is a dumb hack to make the window slightly smaller by using a tiny message box instead of a large directory window.
+                System.Windows.Forms.MessageBox.Show( "Hollow Knight found!" );
+            }
+            else
+            {
+                System.Windows.Forms.MessageBox.Show( "Hollow Knight not found in "+checkPath );
+                foundGamePath = false;
+            }
+        } else {
+            foundGamePath = false;
+        }
+    return foundGamePath;
+    }
+
 
     public void SelectHollowKnightExe()
     {
@@ -449,7 +475,24 @@ public class CrossroadsSettings : MonoBehaviour
             finder.CancelSearch();
 
         string startingPath = @"C:\Program Files (x86)";
+        // If program files doesn't exist, start in the user's home folder instead.
+        string[] possibleStartingPaths = {
+        @"C:\Program Files (x86)",
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        Environment.GetFolderPath(Environment.SpecialFolder.Desktop)
+        };
+        foreach (string p in possibleStartingPaths)
+        {
+            if (!string.IsNullOrEmpty(p) && Directory.Exists(p))
+            {
+                startingPath = p;
+                break;
+            }
+        }
 
+        #if UNITY_STANDALONE_LINUX
+        foundGamePath = getHollowKnightExeLinux(startingPath);
+        #else
         var paths = StandaloneFileBrowser.OpenFolderPanel( "Select your Hollow Knight game folder", startingPath, false);
 
         foreach( var s in paths )
@@ -475,12 +518,13 @@ public class CrossroadsSettings : MonoBehaviour
         {
             foundGamePath = false;
         }
+        #endif
     }
 
     //Cleanup install folders on quit in editor mode
     void OnApplicationQuit()
     {
-        if( Application.isEditor && removeCreatedFoldersInEditorMode )
+        if( UnityEngine.Application.isEditor && removeCreatedFoldersInEditorMode )
         {
             if( Directory.Exists( UnityEngine.Application.dataPath + "/" + "Settings" + "/" ) )
                 Directory.Delete( UnityEngine.Application.dataPath + "/" + "Settings" + "/", true );

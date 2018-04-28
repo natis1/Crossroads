@@ -3,7 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
-using Ionic.Zip;
+using ICSharpCode.SharpZipLib.Core;
+using ICSharpCode.SharpZipLib.Zip;
 using System;
 using System.Xml;
 using System.Xml.Serialization;
@@ -57,13 +58,20 @@ public partial class ModInstaller : MonoBehaviour {
             Debug.Log( "Source zip file: " + zipfilePath );
             Debug.Log( "Printing unzipped files" );
 
-            using( ZipFile zip = ZipFile.Read( zipfilePath ) )
+            ZipFile zip = new ZipFile( File.OpenRead(zipfilePath) );
+            foreach( ZipEntry e in zip )
             {
-                foreach( ZipEntry e in zip )
-                {
-                    Debug.Log( e.FileName );
-
-                    e.Extract( extractTo, ExtractExistingFileAction.OverwriteSilently );
+                Debug.Log( e.Name );
+                byte[] buffer = new byte[4096];
+                Stream zipStream = zip.GetInputStream(e);
+                String fullZipPath = Path.Combine(extractTo, e.Name);
+                Debug.Log( fullZipPath + " is your full path" );
+                if (!e.IsFile) {
+                    Directory.CreateDirectory( fullZipPath );
+                    continue;
+                }
+                using (FileStream streamWriter = File.Create(fullZipPath)) {
+                    StreamUtils.Copy(zipStream, streamWriter, buffer);
                 }
             }
         }
@@ -440,7 +448,7 @@ public partial class ModInstaller : MonoBehaviour {
             if( !file.Contains( "user" ) )
                 continue;
 
-            string dest = savePath + "/" + file;
+            string dest = savePath + file;
 
             //copy the backup in
             File.Copy( saveFile, dest, true );
